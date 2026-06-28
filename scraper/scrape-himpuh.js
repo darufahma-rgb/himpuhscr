@@ -1,19 +1,13 @@
 /**
- * scrape-himpuh.js  (versi auto-save bertahap)
+ * scrape-himpuh.js  (versi Supabase + auto-save bertahap)
  * ----------------------------------------------------------------------------
  * Mengambil data anggota dari direktori PUBLIK HIMPUH (himpuh.or.id),
- * lalu menyimpan ke CSV & JSON untuk follow-up MANUAL satu per satu.
- *
- * FITUR AUTO-SAVE:
- *  - Data disimpan ke CSV & JSON setiap SAVE_EVERY data berhasil dikumpulkan.
- *  - Progress (ID terakhir) disimpan ke progress.json agar bisa dilanjut
- *    jika proses terhenti di tengah jalan.
- *  - Jalankan ulang script → otomatis lanjut dari ID terakhir.
+ * menyimpan ke Supabase (real-time) + CSV/JSON sebagai backup lokal.
  *
  * CARA PAKAI:
  *   1) npm install              (dependensi ada di package.json)
+ *   2) Set SUPABASE_URL dan SUPABASE_SERVICE_KEY di environment
  *   2) node scrape-himpuh.js   <- mulai / lanjut otomatis
- *   3) Hasil: himpuh-travel.csv / himpuh-travel.json
  * ----------------------------------------------------------------------------
  */
 
@@ -23,23 +17,21 @@ const axios   = require('axios');
 const cheerio = require('cheerio');
 const fs      = require('fs');
 const path    = require('path');
-const os      = require('os');
+const { createClient } = require('@supabase/supabase-js');
 
 // ====================== KONFIGURASI ======================
-const START_ID      = 1;        // ID awal (diabaikan jika ada progress.json)
-const END_ID        = 950;      // ID akhir
-const DELAY_MS      = 2500;     // Jeda antar request — JANGAN dikecilkan
-const TIMEOUT_MS    = 15000;    // Timeout per request
-const MAX_REDIRECTS = 2;        // Maks redirect per request
-const SAVE_EVERY    = 10;       // Auto-save setiap N data berhasil dikumpulkan
+const START_ID      = 1;
+const END_ID        = 950;
+const DELAY_MS      = 2500;
+const TIMEOUT_MS    = 15000;
+const MAX_REDIRECTS = 2;
+const SAVE_EVERY    = 10;
 
-// Output ditulis ke direktori root workspace (parent scraper/)
 const ROOT_DIR      = path.resolve(__dirname, '..');
 const OUTPUT_CSV    = path.join(ROOT_DIR, 'himpuh-travel.csv');
 const OUTPUT_JSON   = path.join(ROOT_DIR, 'himpuh-travel.json');
 const PROGRESS_FILE = path.join(ROOT_DIR, 'progress.json');
 
-// Filter Jabodetabek (set false untuk ambil SEMUA wilayah)
 const FILTER_JABODETABEK = true;
 const KOTA_JABODETABEK = [
   'jakarta', 'bekasi', 'depok', 'tangerang', 'bogor',
@@ -48,12 +40,16 @@ const KOTA_JABODETABEK = [
 ];
 // =========================================================
 
-const BASE  = 'https://himpuh.or.id/daftar-anggota/detail';
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BASE    = 'https://himpuh.or.id/daftar-anggota/detail';
+const sleep   = (ms) => new Promise((r) => setTimeout(r, ms));
 
-function log(msg) {
-  process.stdout.write(msg + '\n');
-}
+// Supabase client (optional — falls back to file-only if not configured)
+const SUPABASE_ENABLED = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY);
+const supabase = SUPABASE_ENABLED
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY)
+  : null;
+
+function log(msg) { process.stdout.write(msg + '\n'); }
 
 function logError(context, id, err) {
   const ts  = new Date().toISOString();
@@ -69,9 +65,7 @@ function getField($, label) {
     const cells = $(tr).find('td, th');
     if (cells.length >= 2) {
       const key = $(cells[0]).text().trim().toLowerCase();
-      if (key.includes(label.toLowerCase())) {
-        val = $(cells[1]).text().trim();
-      }
+      if (key.includes(label.toLowerCase())) val = $(cells[1]).text().trim();
     }
   });
   return val;
@@ -80,7 +74,7 @@ function getField($, label) {
 function isJabodetabek(alamat) {
   if (!alamat) return false;
   const a = alamat.toLowerCase();
-  return KOTA_JABODETABEK.some((kota) => a.includes(kota));
+  return KOTA_JABODETABEK.some((k) => a.includes(k));
 }
 
 function tebakKota(alamat) {
@@ -109,66 +103,99 @@ function atomicWrite(filePath, content, encoding) {
   fs.renameSync(tmp, filePath);
 }
 
-// ---------- simpan ----------
+// ---------- Supabase upsert ----------
+
+async function upsertSupabase(data) {
+  if (!supabase) return;
+  const row = {
+    id:              data.id,
+    nama_perusahaan: data.nama_perusahaan || '',
+    merek_dagang:    data.merek_dagang    || '',
+    jenis_anggota:   data.jenis_anggota   || '',
+    no_registrasi:   data.no_registrasi   || '',
+    alamat:          data.alamat          || '',
+    telepon:         data.telepon         || '',
+    email:           data.email           || '',
+    website:         data.website         || '',
+    url_himpuh:      data.url_himpuh      || '',
+    kota:            data.kota            || '',
+  };
+  const { error } = await supabase.from('himpuh_travel').upsert(row, { onConflict: 'id' });
+  if (error) logError('upsertSupabase', data.id, error);
+}
+
+async function updateProgressSupabase(lastId, jumlah) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('scraper_progress')
+    .upsert({ id: 1, last_id: lastId, jumlah, saved_at: new Date().toISOString() }, { onConflict: 'id' })
+    .catch(() => ({ error: null }));
+  if (error) logError('updateProgressSupabase', lastId, error);
+}
+
+// ---------- file saves (backup) ----------
 
 function simpanCSV(hasil) {
   try {
     const header = [
-      'No', 'Nama Perusahaan', 'Merek Dagang', 'Kota', 'Alamat',
-      'Telepon/WA', 'Email', 'Website', 'Jenis', 'Link HIMPUH',
-      'Status Follow-up', 'Catatan',
+      'No','Nama Perusahaan','Merek Dagang','Kota','Alamat',
+      'Telepon/WA','Email','Website','Jenis','Link HIMPUH',
+      'Status Follow-up','Catatan',
     ];
     const rows = hasil.map((d, i) => [
-      i + 1, d.nama_perusahaan, d.merek_dagang, d.kota, d.alamat,
+      i+1, d.nama_perusahaan, d.merek_dagang, d.kota, d.alamat,
       d.telepon, d.email, d.website, d.jenis_anggota, d.url_himpuh,
       'Belum dihubungi', '',
     ].map(csvEscape).join(','));
-    const csv = [header.map(csvEscape).join(','), ...rows].join('\n');
-    atomicWrite(OUTPUT_CSV, '\uFEFF' + csv, 'utf8');
-  } catch (e) {
-    logError('simpanCSV', 'n/a', e);
-  }
+    atomicWrite(OUTPUT_CSV, '\uFEFF' + [header.map(csvEscape).join(','), ...rows].join('\n'), 'utf8');
+  } catch (e) { logError('simpanCSV', 'n/a', e); }
 }
 
 function simpanJSON(hasil) {
-  try {
-    atomicWrite(OUTPUT_JSON, JSON.stringify(hasil, null, 2), 'utf8');
-  } catch (e) {
-    logError('simpanJSON', 'n/a', e);
-  }
+  try { atomicWrite(OUTPUT_JSON, JSON.stringify(hasil, null, 2), 'utf8'); }
+  catch (e) { logError('simpanJSON', 'n/a', e); }
 }
 
 function simpanProgress(lastId, jumlah) {
   try {
-    atomicWrite(
-      PROGRESS_FILE,
-      JSON.stringify({ lastId, jumlah, savedAt: new Date().toISOString() }),
-      'utf8'
-    );
-  } catch (e) {
-    logError('simpanProgress', lastId, e);
-  }
+    atomicWrite(PROGRESS_FILE, JSON.stringify({ lastId, jumlah, savedAt: new Date().toISOString() }), 'utf8');
+  } catch (e) { logError('simpanProgress', lastId, e); }
 }
 
 function muatProgress() {
   try {
-    if (fs.existsSync(PROGRESS_FILE)) {
+    if (fs.existsSync(PROGRESS_FILE))
       return JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf8'));
-    }
-  } catch (e) {
-    logError('muatProgress', 'n/a', e);
-  }
+  } catch (e) { logError('muatProgress', 'n/a', e); }
   return null;
+}
+
+async function muatProgressDariSupabase() {
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase.from('scraper_progress').select('*').eq('id', 1).single();
+    if (data) return { lastId: data.last_id, jumlah: data.jumlah };
+  } catch (_) {}
+  return null;
+}
+
+async function muatHasilDariSupabase() {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('himpuh_travel')
+      .select('id,nama_perusahaan,merek_dagang,jenis_anggota,no_registrasi,alamat,telepon,email,website,url_himpuh,kota')
+      .order('id', { ascending: true });
+    if (error) { logError('muatHasilDariSupabase', 'n/a', error); return null; }
+    return data || [];
+  } catch (e) { logError('muatHasilDariSupabase', 'n/a', e); return null; }
 }
 
 function muatHasilLama() {
   try {
-    if (fs.existsSync(OUTPUT_JSON)) {
+    if (fs.existsSync(OUTPUT_JSON))
       return JSON.parse(fs.readFileSync(OUTPUT_JSON, 'utf8'));
-    }
-  } catch (e) {
-    logError('muatHasilLama', 'n/a', e);
-  }
+  } catch (e) { logError('muatHasilLama', 'n/a', e); }
   return [];
 }
 
@@ -236,10 +263,33 @@ process.on('SIGINT',  () => handleShutdown('SIGINT'));
 // ---------- main ----------
 
 async function main() {
-  const prog    = muatProgress();
-  const hasil   = muatHasilLama();
-  const startId = prog ? prog.lastId + 1 : START_ID;
+  if (SUPABASE_ENABLED) {
+    log('🔌 Supabase aktif — data akan disimpan real-time ke cloud.');
+  } else {
+    log('⚠️  Supabase tidak dikonfigurasi — hanya simpan ke file lokal.');
+  }
 
+  // Muat progress: utamakan Supabase, fallback file
+  let prog = null;
+  if (SUPABASE_ENABLED) {
+    prog = await muatProgressDariSupabase();
+    if (!prog) prog = muatProgress();
+  } else {
+    prog = muatProgress();
+  }
+
+  // Muat data lama: utamakan Supabase, fallback file
+  let hasil = [];
+  if (SUPABASE_ENABLED) {
+    const fromDB = await muatHasilDariSupabase();
+    hasil = fromDB !== null ? fromDB : muatHasilLama();
+    log(`📦 Loaded ${hasil.length} records dari ${fromDB !== null ? 'Supabase' : 'file lokal'}.`);
+  } else {
+    hasil = muatHasilLama();
+    log(`📦 Loaded ${hasil.length} records dari file lokal.`);
+  }
+
+  const startId = prog ? prog.lastId + 1 : START_ID;
   _hasil = hasil;
 
   if (prog) {
@@ -247,7 +297,7 @@ async function main() {
   } else {
     log(`▶ Mulai baru — ID ${START_ID}–${END_ID}, jeda ${DELAY_MS}ms/req.`);
   }
-  log(`  Auto-save setiap ${SAVE_EVERY} data terkumpul.\n`);
+  log(`  Auto-save file lokal setiap ${SAVE_EVERY} data terkumpul.\n`);
 
   let dicek        = 0;
   let baruDikumpul = 0;
@@ -266,11 +316,15 @@ async function main() {
         baruDikumpul++;
         log(`✓ [${id}] ${data.nama_perusahaan} — ${data.kota || '?'} — ${data.telepon || 'no telp'}`);
 
+        // Simpan ke Supabase langsung (real-time)
+        await upsertSupabase(data);
+
         if (baruDikumpul % SAVE_EVERY === 0) {
           simpanCSV(hasil);
           simpanJSON(hasil);
           simpanProgress(id, hasil.length);
-          log(`  💾 Auto-saved ${hasil.length} travel → ${OUTPUT_CSV}`);
+          await updateProgressSupabase(id, hasil.length);
+          log(`  💾 Auto-saved ${hasil.length} travel (Supabase + file lokal)`);
         }
       } else {
         log(`· [${id}] ${data.nama_perusahaan} (luar Jabodetabek, dilewati)`);
@@ -280,6 +334,7 @@ async function main() {
     if (dicek % 50 === 0) {
       log(`  ── ${dicek} ID dicek, ${hasil.length} travel terkumpul ──`);
       simpanProgress(id, hasil.length);
+      await updateProgressSupabase(id, hasil.length);
     }
 
     if (!_shuttingDown) await sleep(DELAY_MS);
@@ -289,21 +344,17 @@ async function main() {
     simpanCSV(hasil);
     simpanJSON(hasil);
     simpanProgress(END_ID, hasil.length);
+    await updateProgressSupabase(END_ID, hasil.length);
 
-    log(`\n✅ Selesai! ${hasil.length} travel ${FILTER_JABODETABEK ? 'Jabodetabek ' : ''}tersimpan:`);
-    log(`  📄 ${OUTPUT_CSV}   <- buka di Excel / Google Sheets`);
+    log(`\n✅ Selesai! ${hasil.length} travel ${FILTER_JABODETABEK ? 'Jabodetabek ' : ''}tersimpan.`);
+    log(`  ☁️  Supabase: ${SUPABASE_ENABLED ? 'aktif' : 'tidak aktif'}`);
+    log(`  📄 ${OUTPUT_CSV}`);
     log(`  📄 ${OUTPUT_JSON}`);
     log('\nIngat: follow-up manual & personal. Jangan blast spam. Hormati UU PDP.');
 
-    try {
-      if (fs.existsSync(PROGRESS_FILE)) fs.unlinkSync(PROGRESS_FILE);
-    } catch (e) {
-      logError('unlinkProgress', 'n/a', e);
-    }
+    try { if (fs.existsSync(PROGRESS_FILE)) fs.unlinkSync(PROGRESS_FILE); }
+    catch (e) { logError('unlinkProgress', 'n/a', e); }
   }
 }
 
-main().catch((e) => {
-  logError('main', 'n/a', e);
-  process.exit(1);
-});
+main().catch((e) => { logError('main', 'n/a', e); process.exit(1); });
