@@ -1,0 +1,125 @@
+I need you to permanently fix the project instead of applying temporary runtime fixes.
+
+A previous migration installed missing packages in the Replit environment, but the changes were NOT persisted into the repository.
+
+## Critical Issue
+
+The scraper package uses `axios` and `cheerio`, but `scraper/package.json` does not declare them as dependencies.
+
+Current file:
+
+```json
+{
+  "name": "scraper",
+  "version": "1.0.0",
+  "private": true
+}
+```
+
+This means the project only works in the current Replit workspace because the packages already exist in node_modules.
+
+A fresh clone or deployment will fail.
+
+---
+
+## Required Tasks
+
+### 1. Fix scraper/package.json
+
+Add all required dependencies that are actually imported by the scraper source code.
+
+Do NOT guess.
+
+Scan every file under the scraper directory and ensure every imported package is listed under dependencies.
+
+Example:
+
+```json
+{
+  "dependencies": {
+    "axios": "...",
+    "cheerio": "..."
+  }
+}
+```
+
+Keep existing metadata intact.
+
+---
+
+### 2. Reinstall cleanly
+
+Delete:
+
+* node_modules
+* package-lock.json (only inside scraper if needed)
+
+Run a fresh install so the lockfile matches package.json.
+
+---
+
+### 3. Verify imports
+
+Scan every JS/TS file.
+
+Check for missing packages such as:
+
+* axios
+* cheerio
+* dotenv
+* fs-extra
+* p-limit
+* uuid
+* csv-parser
+* etc.
+
+If any package is imported but missing from package.json, add it.
+
+If any package exists in package.json but is never used, remove it.
+
+---
+
+### 4. Verify project boots from scratch
+
+Pretend this repository is freshly cloned.
+
+Confirm that these commands work without manual intervention:
+
+```bash
+npm install
+npm run dev
+```
+
+or the equivalent commands used by this project.
+
+No hidden dependencies should remain.
+
+---
+
+### 5. Validate scraper
+
+Run the scraper.
+
+Ensure:
+
+* axios loads correctly
+* cheerio loads correctly
+* no MODULE_NOT_FOUND errors
+* no import errors
+* no runtime dependency errors
+
+---
+
+### 6. Report
+
+At the end provide:
+
+* Files modified
+* Dependencies added
+* Dependencies removed
+* Commands executed
+* Remaining warnings (if any)
+
+Do NOT stop after installing packages.
+
+The repository itself must be production-ready and reproducible from a clean clone.
