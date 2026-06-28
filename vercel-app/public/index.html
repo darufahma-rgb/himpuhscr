@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Follow-up Travel HIMPUH (Live)</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #059669;
+    --accent-light: #d1fae5;
+    --accent-dark: #047857;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-900: #111827;
+    --red-light: #fee2e2;
+    --blue-light: #dbeafe;
+    --radius: 8px;
+  }
+
+  body { font-family: system-ui,-apple-system,'Segoe UI',sans-serif; background: var(--gray-50); color: var(--gray-900); font-size: 14px; line-height: 1.5; }
+
+  .header {
+    background: white; border-bottom: 1px solid var(--gray-200);
+    padding: 14px 24px; display: flex; align-items: center;
+    justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .logo { font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: -.3px; }
+  .logo span { color: var(--gray-500); font-weight: 400; font-size: 12px; }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; color: var(--accent);
+    background: var(--accent-light); padding: 3px 8px;
+    border-radius: 20px; letter-spacing: .3px;
+  }
+  .live-dot {
+    width: 7px; height: 7px; background: var(--accent);
+    border-radius: 50%; animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  .sync-info { font-size: 11px; color: var(--gray-400); }
+  .sync-info b { color: var(--gray-600); }
+
+  .nama-wrap { display: flex; align-items: center; gap: 7px; }
+  .nama-wrap label { font-size: 12px; color: var(--gray-500); white-space: nowrap; }
+  .nama-input {
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+    padding: 5px 9px; font-size: 13px; width: 160px; outline: none; transition: border .15s;
+  }
+  .nama-input:focus { border-color: var(--accent); }
+
+  .btn-refresh {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px; background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); font-size: 12px; cursor: pointer;
+    color: var(--gray-700); font-weight: 500; transition: all .15s;
+  }
+  .btn-refresh:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-refresh.spinning svg { animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .stats { display: flex; gap: 10px; padding: 18px 24px 0; flex-wrap: wrap; }
+  .stat-card {
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 12px 18px; min-width: 120px; flex: 1;
+  }
+  .stat-label { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); }
+  .stat-val { font-size: 24px; font-weight: 700; line-height: 1.2; }
+  .stat-card.accent { border-color: var(--accent); background: var(--accent-light); }
+  .stat-card.accent .stat-val { color: var(--accent-dark); }
+
+  .scrape-progress {
+    margin: 14px 24px 0;
+    background: white; border: 1px solid var(--gray-200);
+    border-radius: var(--radius); padding: 10px 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .prog-label { font-size: 12px; color: var(--gray-500); white-space: nowrap; }
+  .prog-bar-wrap { flex: 1; background: var(--gray-100); border-radius: 99px; height: 7px; overflow: hidden; }
+  .prog-bar { height: 100%; background: var(--accent); border-radius: 99px; transition: width .5s ease; }
+  .prog-pct { font-size: 12px; font-weight: 600; color: var(--accent-dark); white-space: nowrap; }
+  .prog-detail { font-size: 11px; color: var(--gray-400); }
+
+  .filters {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 24px; flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 300px; }
+  .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--gray-400); pointer-events: none; }
+  .search-input {
+    width: 100%; padding: 8px 10px 8px 33px;
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+    font-size: 13px; outline: none; background: white; transition: border .15s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  select.filter-select {
+    padding: 8px 26px 8px 10px;
+    border: 1px solid var(--gray-200); border-radius: var(--radius);
+    font-size: 13px;
+    background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239ca3af'/%3E%3C/svg%3E") no-repeat right 9px center;
+    appearance: none; outline: none; cursor: pointer; transition: border .15s;
+  }
+  select.filter-select:focus { border-color: var(--accent); }
+  .counter { margin-left: auto; font-size: 12px; color: var(--gray-500); white-space: nowrap; }
+  .btn-export {
+    display: flex; align-items: center; gap: 5px;
+    padding: 8px 13px; background: var(--gray-900); color: white;
+    border: none; border-radius: var(--radius); font-size: 12px;
+    cursor: pointer; font-weight: 500; transition: background .15s;
+  }
+  .btn-export:hover { background: var(--gray-700); }
+
+  .table-wrap { padding: 0 24px 32px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: white; border: 1px solid var(--gray-200); border-radius: var(--radius); overflow: hidden; min-width: 860px; }
+  thead { position: sticky; top: 62px; z-index: 10; }
+  thead th { background: var(--gray-50); border-bottom: 1px solid var(--gray-200); padding: 9px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--gray-100); transition: background .1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(even) { background: var(--gray-50); }
+  tbody tr:hover { background: #ecfdf5; }
+  td { padding: 9px 12px; vertical-align: middle; }
+
+  .td-no { color: var(--gray-400); font-size: 12px; width: 38px; text-align: center; }
+  .td-nama .nama { font-weight: 600; }
+  .td-nama .merek { font-size: 11px; color: var(--gray-400); margin-top: 1px; }
+  .td-kota { white-space: nowrap; color: var(--gray-700); }
+
+  .contact-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+  .btn-wa, .btn-email {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 4px 9px; border-radius: 6px; font-size: 11px;
+    font-weight: 500; text-decoration: none; border: none;
+    cursor: pointer; transition: filter .15s;
+  }
+  .btn-wa { background: #25d366; color: white; }
+  .btn-email { background: #4f46e5; color: white; }
+  .btn-wa:hover, .btn-email:hover { filter: brightness(.9); }
+  .btn-wa.disabled, .btn-email.disabled { background: var(--gray-200); color: var(--gray-400); cursor: not-allowed; pointer-events: none; }
+
+  .td-web a { color: var(--accent); text-decoration: none; font-size: 12px; }
+  .td-web a:hover { text-decoration: underline; }
+  .td-web .no-web { color: var(--gray-300); font-size: 12px; }
+
+  .status-select {
+    padding: 4px 22px 4px 8px; border-radius: 20px; font-size: 12px;
+    font-weight: 500; border: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 6px center;
+    cursor: pointer; outline: none;
+  }
+  .s-belum    { background: var(--gray-100); color: var(--gray-500); }
+  .s-sudah    { background: var(--blue-light); color: #1d4ed8; }
+  .s-tertarik { background: var(--accent-light); color: var(--accent-dark); }
+  .s-tidak    { background: var(--red-light); color: #b91c1c; }
+  .s-deal     { background: #ede9fe; color: #5b21b6; }
+
+  .td-aksi { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .btn-pitch {
+    padding: 4px 9px; background: var(--accent); color: white;
+    border: none; border-radius: 6px; font-size: 11px; font-weight: 500;
+    cursor: pointer; transition: background .15s;
+  }
+  .btn-pitch:hover { background: var(--accent-dark); }
+  .btn-detail {
+    padding: 4px 9px; background: white; color: var(--gray-700);
+    border: 1px solid var(--gray-200); border-radius: 6px; font-size: 11px;
+    font-weight: 500; text-decoration: none; transition: border-color .15s;
+  }
+  .btn-detail:hover { border-color: var(--gray-400); }
+
+  .loading { padding: 80px 24px; text-align: center; color: var(--gray-400); }
+  .spinner {
+    display: inline-block; width: 32px; height: 32px;
+    border: 3px solid var(--gray-200); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .8s linear infinite;
+    margin-bottom: 12px;
+  }
+  .empty { padding: 60px 24px; text-align: center; color: var(--gray-400); }
+
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--gray-900); color: white;
+    padding: 11px 18px; border-radius: var(--radius);
+    font-size: 13px; font-weight: 500;
+    opacity: 0; transform: translateY(6px);
+    transition: all .2s ease; pointer-events: none; z-index: 9999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { background: #b91c1c; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">HIMPUH Leads <span>— Live Dashboard</span></div>
+    <div class="live-badge"><div class="live-dot"></div>AUTO-RELOAD</div>
+    <div class="sync-info" id="syncInfo">Memuat data…</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <button class="btn-refresh" id="btnRefresh" onclick="loadData(true)" title="Refresh sekarang">
+      <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+    <div class="nama-wrap">
+      <label for="namaInput">Nama Anda:</label>
+      <input type="text" id="namaInput" class="nama-input" placeholder="mis. Ahmad">
+    </div>
+  </div>
+</div>
+
+<div class="stats" id="statsRow"></div>
+
+<div class="scrape-progress" id="progressBar" style="display:none">
+  <span class="prog-label">Scraping:</span>
+  <div class="prog-bar-wrap"><div class="prog-bar" id="progBarFill" style="width:0%"></div></div>
+  <span class="prog-pct" id="progPct">0%</span>
+  <span class="prog-detail" id="progDetail"></span>
+</div>
+
+<div class="filters">
+  <div class="search-wrap">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" id="searchInput" class="search-input" placeholder="Cari nama / merek travel…">
+  </div>
+  <select id="kotaFilter" class="filter-select">
+    <option value="">Semua Kota</option>
+  </select>
+  <select id="statusFilter" class="filter-select">
+    <option value="">Semua Status</option>
+    <option value="Belum dihubungi">Belum dihubungi</option>
+    <option value="Sudah dihubungi">Sudah dihubungi</option>
+    <option value="Tertarik">Tertarik</option>
+    <option value="Tidak tertarik">Tidak tertarik</option>
+    <option value="Deal">Deal</option>
+  </select>
+  <span class="counter" id="counter"></span>
+  <button class="btn-export" onclick="exportCSV()">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export CSV
+  </button>
+  <a class="btn-export" href="/api/dashboard/download/csv" download style="text-decoration:none">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    ⬇ Download CSV
+  </a>
+  <a class="btn-export" href="/api/dashboard/download/json" download style="text-decoration:none;background:#1a7f4b">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    ⬇ Download JSON
+  </a>
+</div>
+
+<div class="table-wrap">
+  <div id="loadingState" class="loading">
+    <div class="spinner"></div>
+    <div>Memuat data dari Supabase…</div>
+  </div>
+  <table id="mainTable" style="display:none">
+    <thead>
+      <tr>
+        <th>No</th><th>Nama Travel</th><th>Kota</th><th>Jenis</th>
+        <th>Kontak</th><th>Web</th><th>Status</th><th>Aksi</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div id="emptyState" class="empty" style="display:none">
+    <p style="margin-top:8px">Tidak ada travel yang cocok dengan filter ini.</p>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const RELOAD_INTERVAL_MS = 30_000;
+const END_ID = 950;
+
+function escapeHtml(s) {
+  return (s ?? '').toString()
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+const STATUS_KEY = 'himpuh_status_v1';
+const NAMA_KEY   = 'himpuh_nama_v1';
+const STATUSES   = ['Belum dihubungi','Sudah dihubungi','Tertarik','Tidak tertarik','Deal'];
+const STATUS_CLASS = {
+  'Belum dihubungi':'s-belum','Sudah dihubungi':'s-sudah',
+  'Tertarik':'s-tertarik','Tidak tertarik':'s-tidak','Deal':'s-deal',
+};
+
+let DATA = [];
+let statusMap = loadStatuses();
+let reloadTimer = null;
+let lastCount = -1;
+
+function loadStatuses() {
+  try { return JSON.parse(localStorage.getItem(STATUS_KEY) || '{}'); } catch { return {}; }
+}
+function saveStatuses(m) { localStorage.setItem(STATUS_KEY, JSON.stringify(m)); }
+function getStatus(d) { return statusMap[d.nama_perusahaan] || 'Belum dihubungi'; }
+
+function toWaNumber(raw) {
+  if (!raw) return null;
+  let n = raw.replace(/[\s\-()]/g, '');
+  if (n.startsWith('+')) n = n.slice(1);
+  if (n.startsWith('0')) n = '62' + n.slice(1);
+  return /^\d{8,}$/.test(n) ? n : null;
+}
+function cleanWebsite(w) {
+  if (!w || w === '-' || !w.trim()) return null;
+  const s = w.trim();
+  return s.startsWith('http') ? s : 'https://' + s;
+}
+function firstEmail(raw) {
+  if (!raw) return null;
+  const e = raw.split(/[,;]/)[0].trim();
+  return e.includes('@') ? e : null;
+}
+function timeStr() {
+  return new Date().toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+async function loadData(manual = false) {
+  const btn = document.getElementById('btnRefresh');
+  btn.classList.add('spinning');
+  try {
+    const res = await fetch('/api/data?t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const newData = await res.json();
+    const isNew = newData.length !== lastCount;
+    DATA = newData;
+    lastCount = newData.length;
+    if (isNew) rebuildKotaFilter();
+    renderStats();
+    renderTable();
+    document.getElementById('syncInfo').innerHTML =
+      `Update: <b>${timeStr()}</b> — <b>${DATA.length}</b> travel`;
+    if (manual && isNew) showToast(`Data diperbarui: ${DATA.length} travel`);
+    else if (manual)     showToast('Data sudah terkini ✓');
+  } catch (e) {
+    document.getElementById('syncInfo').textContent = 'Gagal memuat data — ' + e.message;
+    if (manual) showToast('Gagal memuat data: ' + e.message, true);
+  }
+  btn.classList.remove('spinning');
+  loadProgress();
+}
+
+async function loadProgress() {
+  try {
+    const res = await fetch('/api/progress?t=' + Date.now());
+    if (!res.ok) return;
+    const p = await res.json();
+    const bar = document.getElementById('progressBar');
+    if (!p || !p.lastId) { bar.style.display = 'none'; return; }
+    const pct = Math.min(100, Math.round((p.lastId / END_ID) * 100));
+    bar.style.display = 'flex';
+    document.getElementById('progBarFill').style.width = pct + '%';
+    document.getElementById('progPct').textContent = pct + '%';
+    document.getElementById('progDetail').textContent =
+      `ID ${p.lastId}/${END_ID} — ${p.jumlah} travel ditemukan`;
+  } catch (_) {}
+}
+
+function rebuildKotaFilter() {
+  const sel = document.getElementById('kotaFilter');
+  const cur = sel.value;
+  const kota = [...new Set(DATA.map(d => d.kota).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Semua Kota</option>';
+  kota.forEach(k => {
+    const o = document.createElement('option');
+    o.value = k; o.textContent = k;
+    if (k === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function renderStats() {
+  const counts = {};
+  STATUSES.forEach(s => counts[s] = 0);
+  DATA.forEach(d => { const s = getStatus(d); if (counts[s] !== undefined) counts[s]++; });
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card accent">
+      <div class="stat-label">Total Travel</div>
+      <div class="stat-val">${DATA.length}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Belum Dihubungi</div>
+      <div class="stat-val">${counts['Belum dihubungi']}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Sudah Dihubungi</div>
+      <div class="stat-val" style="color:#1d4ed8">${counts['Sudah dihubungi']}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Tertarik</div>
+      <div class="stat-val" style="color:var(--accent-dark)">${counts['Tertarik']}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Deal ✓</div>
+      <div class="stat-val" style="color:#5b21b6">${counts['Deal']}</div>
+    </div>
+  `;
+}
+
+function renderTable() {
+  const q      = document.getElementById('searchInput').value.toLowerCase().trim();
+  const kota   = document.getElementById('kotaFilter').value;
+  const status = document.getElementById('statusFilter').value;
+
+  const filtered = DATA.filter(d => {
+    if (kota   && d.kota !== kota)                                                   return false;
+    if (status && getStatus(d) !== status)                                            return false;
+    if (q && !d.nama_perusahaan.toLowerCase().includes(q) &&
+             !(d.merek_dagang||'').toLowerCase().includes(q))                         return false;
+    return true;
+  });
+
+  document.getElementById('counter').textContent =
+    `Menampilkan ${filtered.length} dari ${DATA.length} travel`;
+
+  const loading = document.getElementById('loadingState');
+  const table   = document.getElementById('mainTable');
+  const empty   = document.getElementById('emptyState');
+  loading.style.display = 'none';
+
+  if (filtered.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  table.style.display = 'table';
+
+  document.getElementById('tbody').innerHTML = filtered.map((d, i) => {
+    const waNum  = toWaNumber(d.telepon);
+    const email1 = firstEmail(d.email);
+    const web    = cleanWebsite(d.website);
+    const st     = getStatus(d);
+    const merek  = d.merek_dagang && d.merek_dagang !== d.nama_perusahaan ? d.merek_dagang : '';
+
+    const safeWaNum    = waNum  ? escapeHtml(waNum)  : null;
+    const safeEmail1   = email1 ? escapeHtml(email1) : null;
+    const safeWeb      = web    ? escapeHtml(web)    : null;
+    const safeWebLabel = escapeHtml((d.website || '').replace(/^https?:\/\//, '').substring(0, 22));
+
+    const waBtn = safeWaNum
+      ? `<a class="btn-wa" href="https://wa.me/${safeWaNum}" target="_blank" rel="noopener">
+           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.845L0 24l6.31-1.513A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.003-1.366l-.359-.213-3.743.897.934-3.637-.234-.373A9.79 9.79 0 012.182 12C2.182 6.578 6.578 2.182 12 2.182S21.818 6.578 21.818 12 17.422 21.818 12 21.818z"/></svg>
+           WA
+         </a>`
+      : `<button class="btn-wa disabled" disabled>WA</button>`;
+
+    const emailBtn = safeEmail1
+      ? `<a class="btn-email" href="mailto:${safeEmail1}">
+           <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
+           Email
+         </a>`
+      : `<button class="btn-email disabled" disabled>Email</button>`;
+
+    const webCell = safeWeb
+      ? `<a href="${safeWeb}" target="_blank" rel="noopener">${safeWebLabel}</a>`
+      : `<span class="no-web">—</span>`;
+
+    const statusOpts = STATUSES.map(s =>
+      `<option value="${escapeHtml(s)}"${s===st?' selected':''}>${escapeHtml(s)}</option>`
+    ).join('');
+
+    return `<tr>
+      <td class="td-no">${i+1}</td>
+      <td class="td-nama">
+        <div class="nama">${escapeHtml(d.nama_perusahaan)}</div>
+        ${merek ? `<div class="merek">${escapeHtml(merek)}</div>` : ''}
+      </td>
+      <td class="td-kota">${escapeHtml(d.kota) || '—'}</td>
+      <td style="font-size:11px;color:var(--gray-500);max-width:110px;white-space:normal">${escapeHtml(d.jenis_anggota) || '—'}</td>
+      <td><div class="contact-btns">${waBtn}${emailBtn}</div></td>
+      <td class="td-web">${webCell}</td>
+      <td>
+        <select class="status-select ${STATUS_CLASS[st]||'s-belum'}"
+                onchange="changeStatus(this,${JSON.stringify(d.nama_perusahaan)})">
+          ${statusOpts}
+        </select>
+      </td>
+      <td class="td-aksi">
+        <button class="btn-pitch" onclick="salinPitch(${JSON.stringify(d.nama_perusahaan)},${JSON.stringify(d.merek_dagang)})">Salin Pitch</button>
+        <a class="btn-detail" href="${escapeHtml(d.url_himpuh)}" target="_blank" rel="noopener">Detail</a>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function changeStatus(sel, nama) {
+  const val = sel.value;
+  statusMap[nama] = val;
+  saveStatuses(statusMap);
+  sel.className = 'status-select ' + (STATUS_CLASS[val] || 's-belum');
+  renderStats();
+}
+
+function salinPitch(namaPT, merek) {
+  const namaAnda = document.getElementById('namaInput').value.trim() || '[NAMA SAYA]';
+  const display  = (merek && merek.trim() && merek !== namaPT) ? merek : namaPT;
+  const tpl = `Assalamualaikum, perkenalkan saya ${namaAnda} dari Umrahme.
+
+Saya melihat ${display} di direktori HIMPUH. Saya mengembangkan aplikasi pendamping umrah ber-merek travel sendiri (white-label) — jamaah dapat jadwal, doa, panduan ibadah, peta ziarah, sampai pengumuman, semua dalam satu aplikasi bernama travel Bapak/Ibu.
+
+Boleh saya kirimkan demo singkatnya? Cukup 3 menit, tanpa komitmen.`;
+
+  navigator.clipboard.writeText(tpl)
+    .then(() => showToast('Pesan tersalin ✓'))
+    .catch(() => {
+      const ta = document.createElement('textarea');
+      ta.value = tpl; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast('Pesan tersalin ✓');
+    });
+}
+
+function exportCSV() {
+  const esc = s => `"${(s||'').toString().replace(/"/g,'""')}"`;
+  const header = ['No','Nama Perusahaan','Merek Dagang','Kota','Alamat','Telepon/WA','Email','Website','Jenis','Link HIMPUH','Status Follow-up'];
+  const rows = DATA.map((d,i) => [
+    i+1, d.nama_perusahaan, d.merek_dagang, d.kota, d.alamat,
+    d.telepon, d.email, d.website, d.jenis_anggota, d.url_himpuh,
+    getStatus(d)
+  ].map(esc).join(','));
+  const csv = '\uFEFF' + [header.map(esc).join(','), ...rows].join('\n');
+  const a   = document.createElement('a');
+  a.href    = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8;'}));
+  a.download = 'himpuh-travel-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isError ? 'error show' : 'show';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.className = ''; }, 2800);
+}
+
+function startAutoReload() {
+  clearInterval(reloadTimer);
+  reloadTimer = setInterval(() => loadData(false), RELOAD_INTERVAL_MS);
+}
+
+document.getElementById('namaInput').value = localStorage.getItem(NAMA_KEY) || '';
+document.getElementById('namaInput').addEventListener('input', e => localStorage.setItem(NAMA_KEY, e.target.value));
+['searchInput','kotaFilter','statusFilter'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderTable);
+  document.getElementById(id).addEventListener('change', renderTable);
+});
+
+loadData(false);
+startAutoReload();
+</script>
+</body>
+</html>
