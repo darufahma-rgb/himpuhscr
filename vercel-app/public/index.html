@@ -239,6 +239,9 @@
   <select id="kotaFilter" class="filter-select">
     <option value="">Semua Kota</option>
   </select>
+  <select id="jenisFilter" class="filter-select">
+    <option value="">Semua Jenis</option>
+  </select>
   <select id="statusFilter" class="filter-select">
     <option value="">Semua Status</option>
     <option value="Belum dihubungi">Belum dihubungi</option>
@@ -343,7 +346,7 @@ async function loadData(manual = false) {
     const isNew = newData.length !== lastCount;
     DATA = newData;
     lastCount = newData.length;
-    if (isNew) { rebuildKotaFilter(); rebuildProvinsiFilter(); }
+    if (isNew) { rebuildKotaFilter(); rebuildProvinsiFilter(); rebuildJenisFilter(); }
     renderStats();
     renderTable();
     document.getElementById('syncInfo').innerHTML =
@@ -445,6 +448,27 @@ function rebuildProvinsiFilter() {
   });
 }
 
+function rebuildJenisFilter() {
+  const sel = document.getElementById('jenisFilter');
+  const cur = sel.value;
+  const JENIS_LABEL = { PIHK: 'PIHK — Haji Khusus', PPIU: 'PPIU — Umrah', BPW: 'BPW — Biro Perjalanan Wisata' };
+  const jenisSet = new Set();
+  DATA.forEach(d => {
+    const raw = (d.jenis_anggota || '').trim();
+    if (!raw) return;
+    if (raw.includes('Haji Khusus'))     jenisSet.add('PIHK');
+    else if (raw.includes('Umrah'))      jenisSet.add('PPIU');
+    else if (raw.includes('Biro Perjalanan')) jenisSet.add('BPW');
+  });
+  sel.innerHTML = '<option value="">Semua Jenis</option>';
+  [...jenisSet].sort().forEach(j => {
+    const o = document.createElement('option');
+    o.value = j; o.textContent = JENIS_LABEL[j] || j;
+    if (j === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
 function renderStats() {
   const counts = {};
   STATUSES.forEach(s => counts[s] = 0);
@@ -477,11 +501,18 @@ function renderTable() {
   const q        = document.getElementById('searchInput').value.toLowerCase().trim();
   const provinsi = document.getElementById('provinsiFilter').value;
   const kota     = document.getElementById('kotaFilter').value;
+  const jenis    = document.getElementById('jenisFilter').value;
   const status   = document.getElementById('statusFilter').value;
 
   const filtered = DATA.filter(d => {
     if (provinsi && getProvinsi(d.alamat) !== provinsi) return false;
     if (kota     && d.kota !== kota)                    return false;
+    if (jenis) {
+      const raw = d.jenis_anggota || '';
+      if (jenis === 'PIHK' && !raw.includes('Haji Khusus'))      return false;
+      if (jenis === 'PPIU' && !raw.includes('Umrah'))             return false;
+      if (jenis === 'BPW'  && !raw.includes('Biro Perjalanan'))   return false;
+    }
     if (status   && getStatus(d) !== status)            return false;
     if (q && !d.nama_perusahaan.toLowerCase().includes(q) &&
              !(d.merek_dagang||'').toLowerCase().includes(q)) return false;
@@ -620,7 +651,7 @@ function startAutoReload() {
 
 document.getElementById('namaInput').value = localStorage.getItem(NAMA_KEY) || '';
 document.getElementById('namaInput').addEventListener('input', e => localStorage.setItem(NAMA_KEY, e.target.value));
-['searchInput','provinsiFilter','kotaFilter','statusFilter'].forEach(id => {
+['searchInput','provinsiFilter','kotaFilter','jenisFilter','statusFilter'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderTable);
   document.getElementById(id).addEventListener('change', renderTable);
 });
