@@ -21,7 +21,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 // ====================== KONFIGURASI ======================
 const START_ID      = 1;
-const END_ID        = 950;
+const END_ID        = 1500;
 const DELAY_MS      = 2500;
 const TIMEOUT_MS    = 15000;
 const MAX_REDIRECTS = 2;
@@ -32,7 +32,7 @@ const OUTPUT_CSV    = path.join(ROOT_DIR, 'himpuh-travel.csv');
 const OUTPUT_JSON   = path.join(ROOT_DIR, 'himpuh-travel.json');
 const PROGRESS_FILE = path.join(ROOT_DIR, 'progress.json');
 
-const FILTER_JABODETABEK = true;
+const FILTER_JABODETABEK = false;
 const KOTA_JABODETABEK = [
   'jakarta', 'bekasi', 'depok', 'tangerang', 'bogor',
   'jakarta pusat', 'jakarta selatan', 'jakarta barat', 'jakarta timur', 'jakarta utara',
