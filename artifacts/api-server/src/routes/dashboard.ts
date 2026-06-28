@@ -29,6 +29,24 @@ router.get("/dashboard/progress", (_req, res) => {
   res.json(readJson(PROGRESS_FILE, {}));
 });
 
+router.get("/dashboard/download/csv", (_req, res) => {
+  const file = path.join(WORKSPACE_ROOT, "himpuh-travel.csv");
+  if (!fs.existsSync(file)) { res.status(404).send("File tidak ditemukan"); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Disposition", `attachment; filename="himpuh-travel-${today}.csv"`);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.send(fs.readFileSync(file));
+});
+
+router.get("/dashboard/download/json", (_req, res) => {
+  const file = path.join(WORKSPACE_ROOT, "himpuh-travel.json");
+  if (!fs.existsSync(file)) { res.status(404).send("File tidak ditemukan"); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Disposition", `attachment; filename="himpuh-travel-${today}.json"`);
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.send(fs.readFileSync(file));
+});
+
 router.get("/dashboard", (_req, res) => {
   if (!fs.existsSync(HTML_FILE)) {
     res.status(404).send(`Dashboard HTML not found at: ${HTML_FILE}`);
