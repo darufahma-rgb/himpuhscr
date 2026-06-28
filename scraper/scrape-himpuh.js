@@ -84,6 +84,52 @@ function tebakKota(alamat) {
   return found ? found.replace(/\b\w/g, (c) => c.toUpperCase()) : '';
 }
 
+const PROVINSI_MAP = [
+  [['jakarta pusat','jakarta selatan','jakarta barat','jakarta timur','jakarta utara','jakarta'], 'DKI Jakarta'],
+  [['tangerang selatan','tangerang','serang','cilegon','lebak','pandeglang','banten'], 'Banten'],
+  [['bekasi','depok','bogor','bandung','cimahi','sukabumi','tasikmalaya','cirebon','karawang','purwakarta','subang','garut','cianjur','majalengka','sumedang','indramayu','kuningan'], 'Jawa Barat'],
+  [['semarang','solo','surakarta','magelang','pekalongan','tegal','salatiga','purwokerto','kudus','demak','wonosobo','purworejo','kebumen','cilacap','banyumas','klaten'], 'Jawa Tengah'],
+  [['yogyakarta','yogya','sleman','bantul','kulon progo','gunung kidul'], 'DI Yogyakarta'],
+  [['surabaya','malang','sidoarjo','gresik','pasuruan','probolinggo','batu','mojokerto','jombang','kediri','blitar','madiun','ngawi','bojonegoro','tuban','lamongan','jember','banyuwangi','situbondo','bondowoso','lumajang','pamekasan','sumenep','sampang','bangkalan'], 'Jawa Timur'],
+  [['medan','binjai','tebing tinggi','pematangsiantar','sibolga','tanjungbalai','padangsidimpuan','deli serdang','langkat','sumut'], 'Sumatera Utara'],
+  [['aceh','banda aceh','sabang','lhokseumawe','langsa'], 'Aceh'],
+  [['padang','bukittinggi','payakumbuh','sawahlunto','solok','pariaman','padang panjang','sumbar'], 'Sumatera Barat'],
+  [['pekanbaru','dumai','riau'], 'Riau'],
+  [['batam','tanjungpinang','kepri','bintan','karimun'], 'Kepulauan Riau'],
+  [['jambi'], 'Jambi'],
+  [['palembang','lubuklinggau','prabumulih','pagaralam','baturaja','muara enim','sumsel'], 'Sumatera Selatan'],
+  [['pangkalpinang','bangka','belitung'], 'Bangka Belitung'],
+  [['bengkulu'], 'Bengkulu'],
+  [['bandar lampung','metro lampung','lampung'], 'Lampung'],
+  [['denpasar','badung','gianyar','tabanan','klungkung','karangasem','buleleng','jembrana','bali'], 'Bali'],
+  [['mataram','lombok','sumbawa','bima','dompu','ntb'], 'Nusa Tenggara Barat'],
+  [['kupang','ende','flores','maumere','waingapu','ntt'], 'Nusa Tenggara Timur'],
+  [['pontianak','singkawang','ketapang','sanggau','sintang','kalbar'], 'Kalimantan Barat'],
+  [['palangkaraya','sampit','pangkalan bun','kalteng'], 'Kalimantan Tengah'],
+  [['banjarmasin','banjarbaru','martapura','kalsel'], 'Kalimantan Selatan'],
+  [['samarinda','balikpapan','bontang','kutai','berau','sangatta','kaltim'], 'Kalimantan Timur'],
+  [['tarakan','tanjung selor','nunukan','bulungan','kaltara'], 'Kalimantan Utara'],
+  [['manado','bitung','tomohon','kotamobagu','minahasa','sulut'], 'Sulawesi Utara'],
+  [['gorontalo'], 'Gorontalo'],
+  [['palu','poso','tolitoli','banggai','morowali','sulteng'], 'Sulawesi Tengah'],
+  [['makassar','parepare','palopo','bone','wajo','maros','gowa','takalar','jeneponto','bantaeng','bulukumba','sinjai','pinrang','barru','soppeng','sidrap','luwu','sulsel'], 'Sulawesi Selatan'],
+  [['kendari','baubau','kolaka','konawe','sultra'], 'Sulawesi Tenggara'],
+  [['mamuju','polewali','majene','pasangkayu','sulbar'], 'Sulawesi Barat'],
+  [['ambon','maluku tengah','maluku'], 'Maluku'],
+  [['ternate','tidore','sofifi','malut'], 'Maluku Utara'],
+  [['manokwari','sorong','papua barat'], 'Papua Barat'],
+  [['jayapura','merauke','timika','nabire','wamena','biak','papua'], 'Papua'],
+];
+
+function tebakProvinsi(alamat) {
+  if (!alamat) return '';
+  const a = alamat.toLowerCase();
+  for (const [kws, prov] of PROVINSI_MAP) {
+    if (kws.some((k) => a.includes(k))) return prov;
+  }
+  return '';
+}
+
 function bersihkanTelepon(raw) {
   if (!raw) return '';
   const match = raw.match(/[+]?[\d\s\-()]{7,}/);
@@ -230,7 +276,8 @@ async function scrapeOne(id) {
       website:         getField($, 'Website'),
       url_himpuh:      url,
     };
-    data.kota = tebakKota(data.alamat);
+    data.kota     = tebakKota(data.alamat);
+    data.provinsi = tebakProvinsi(data.alamat);
     return data;
   } catch (e) {
     const code = e.code || (e.response && e.response.status) || 'ERR';

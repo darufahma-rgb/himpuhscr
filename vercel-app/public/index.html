@@ -233,6 +233,9 @@
     <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     <input type="text" id="searchInput" class="search-input" placeholder="Cari nama / merek travel…">
   </div>
+  <select id="provinsiFilter" class="filter-select">
+    <option value="">Semua Provinsi</option>
+  </select>
   <select id="kotaFilter" class="filter-select">
     <option value="">Semua Kota</option>
   </select>
@@ -340,7 +343,7 @@ async function loadData(manual = false) {
     const isNew = newData.length !== lastCount;
     DATA = newData;
     lastCount = newData.length;
-    if (isNew) rebuildKotaFilter();
+    if (isNew) { rebuildKotaFilter(); rebuildProvinsiFilter(); }
     renderStats();
     renderTable();
     document.getElementById('syncInfo').innerHTML =
@@ -384,6 +387,64 @@ function rebuildKotaFilter() {
   });
 }
 
+const PROVINSI_MAP = [
+  [['jakarta pusat','jakarta selatan','jakarta barat','jakarta timur','jakarta utara','jakarta'], 'DKI Jakarta'],
+  [['tangerang selatan','tangerang','serang','cilegon','lebak','pandeglang','banten'], 'Banten'],
+  [['bekasi','depok','bogor','bandung','cimahi','sukabumi','tasikmalaya','cirebon','karawang','purwakarta','subang','garut','cianjur','majalengka','sumedang','indramayu','kuningan'], 'Jawa Barat'],
+  [['semarang','solo','surakarta','magelang','pekalongan','tegal','salatiga','purwokerto','kudus','demak','wonosobo','purworejo','kebumen','cilacap','banyumas','klaten'], 'Jawa Tengah'],
+  [['yogyakarta','yogya','sleman','bantul','kulon progo','gunung kidul'], 'DI Yogyakarta'],
+  [['surabaya','malang','sidoarjo','gresik','pasuruan','probolinggo','batu','mojokerto','jombang','kediri','blitar','madiun','ngawi','bojonegoro','tuban','lamongan','jember','banyuwangi','situbondo','bondowoso','lumajang','pamekasan','sumenep','sampang','bangkalan'], 'Jawa Timur'],
+  [['medan','binjai','tebing tinggi','pematangsiantar','sibolga','tanjungbalai','padangsidimpuan','deli serdang','langkat','sumut'], 'Sumatera Utara'],
+  [['aceh','banda aceh','sabang','lhokseumawe','langsa'], 'Aceh'],
+  [['padang','bukittinggi','payakumbuh','sawahlunto','solok','pariaman','padang panjang','sumbar'], 'Sumatera Barat'],
+  [['pekanbaru','dumai','riau'], 'Riau'],
+  [['batam','tanjungpinang','kepri','bintan','karimun'], 'Kepulauan Riau'],
+  [['jambi'], 'Jambi'],
+  [['palembang','lubuklinggau','prabumulih','pagaralam','baturaja','muara enim','sumsel'], 'Sumatera Selatan'],
+  [['pangkalpinang','bangka','belitung'], 'Bangka Belitung'],
+  [['bengkulu'], 'Bengkulu'],
+  [['bandar lampung','metro lampung','lampung'], 'Lampung'],
+  [['denpasar','badung','gianyar','tabanan','klungkung','karangasem','buleleng','jembrana','bali'], 'Bali'],
+  [['mataram','lombok','sumbawa','bima','dompu','ntb'], 'Nusa Tenggara Barat'],
+  [['kupang','ende','flores','maumere','waingapu','ntt'], 'Nusa Tenggara Timur'],
+  [['pontianak','singkawang','ketapang','sanggau','sintang','kalbar'], 'Kalimantan Barat'],
+  [['palangkaraya','sampit','pangkalan bun','kalteng'], 'Kalimantan Tengah'],
+  [['banjarmasin','banjarbaru','martapura','kalsel'], 'Kalimantan Selatan'],
+  [['samarinda','balikpapan','bontang','kutai','berau','sangatta','kaltim'], 'Kalimantan Timur'],
+  [['tarakan','tanjung selor','nunukan','bulungan','kaltara'], 'Kalimantan Utara'],
+  [['manado','bitung','tomohon','kotamobagu','minahasa','sulut'], 'Sulawesi Utara'],
+  [['gorontalo'], 'Gorontalo'],
+  [['palu','poso','tolitoli','banggai','morowali','sulteng'], 'Sulawesi Tengah'],
+  [['makassar','parepare','palopo','bone','wajo','maros','gowa','takalar','jeneponto','bantaeng','bulukumba','sinjai','pinrang','barru','soppeng','sidrap','luwu','sulsel'], 'Sulawesi Selatan'],
+  [['kendari','baubau','kolaka','konawe','sultra'], 'Sulawesi Tenggara'],
+  [['mamuju','polewali','majene','pasangkayu','sulbar'], 'Sulawesi Barat'],
+  [['ambon','maluku tengah','maluku'], 'Maluku'],
+  [['ternate','tidore','sofifi','malut'], 'Maluku Utara'],
+  [['manokwari','sorong','papua barat'], 'Papua Barat'],
+  [['jayapura','merauke','timika','nabire','wamena','biak','papua'], 'Papua'],
+];
+function getProvinsi(alamat) {
+  if (!alamat) return '';
+  const a = alamat.toLowerCase();
+  for (const [kws, prov] of PROVINSI_MAP) {
+    if (kws.some(k => a.includes(k))) return prov;
+  }
+  return '';
+}
+
+function rebuildProvinsiFilter() {
+  const sel = document.getElementById('provinsiFilter');
+  const cur = sel.value;
+  const provs = [...new Set(DATA.map(d => getProvinsi(d.alamat)).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Semua Provinsi</option>';
+  provs.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p; o.textContent = p;
+    if (p === cur) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
 function renderStats() {
   const counts = {};
   STATUSES.forEach(s => counts[s] = 0);
@@ -413,15 +474,17 @@ function renderStats() {
 }
 
 function renderTable() {
-  const q      = document.getElementById('searchInput').value.toLowerCase().trim();
-  const kota   = document.getElementById('kotaFilter').value;
-  const status = document.getElementById('statusFilter').value;
+  const q        = document.getElementById('searchInput').value.toLowerCase().trim();
+  const provinsi = document.getElementById('provinsiFilter').value;
+  const kota     = document.getElementById('kotaFilter').value;
+  const status   = document.getElementById('statusFilter').value;
 
   const filtered = DATA.filter(d => {
-    if (kota   && d.kota !== kota)                                                   return false;
-    if (status && getStatus(d) !== status)                                            return false;
+    if (provinsi && getProvinsi(d.alamat) !== provinsi) return false;
+    if (kota     && d.kota !== kota)                    return false;
+    if (status   && getStatus(d) !== status)            return false;
     if (q && !d.nama_perusahaan.toLowerCase().includes(q) &&
-             !(d.merek_dagang||'').toLowerCase().includes(q))                         return false;
+             !(d.merek_dagang||'').toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -481,7 +544,7 @@ function renderTable() {
         <div class="nama">${escapeHtml(d.nama_perusahaan)}</div>
         ${merek ? `<div class="merek">${escapeHtml(merek)}</div>` : ''}
       </td>
-      <td class="td-kota">${escapeHtml(d.kota) || '—'}</td>
+      <td class="td-kota">${escapeHtml(d.kota) || '—'}${getProvinsi(d.alamat) ? `<div style="font-size:10px;color:var(--gray-400);margin-top:1px">${escapeHtml(getProvinsi(d.alamat))}</div>` : ''}</td>
       <td style="font-size:11px;color:var(--gray-500);max-width:110px;white-space:normal">${escapeHtml(d.jenis_anggota) || '—'}</td>
       <td><div class="contact-btns">${waBtn}${emailBtn}</div></td>
       <td class="td-web">${webCell}</td>
@@ -557,7 +620,7 @@ function startAutoReload() {
 
 document.getElementById('namaInput').value = localStorage.getItem(NAMA_KEY) || '';
 document.getElementById('namaInput').addEventListener('input', e => localStorage.setItem(NAMA_KEY, e.target.value));
-['searchInput','kotaFilter','statusFilter'].forEach(id => {
+['searchInput','provinsiFilter','kotaFilter','statusFilter'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderTable);
   document.getElementById(id).addEventListener('change', renderTable);
 });
