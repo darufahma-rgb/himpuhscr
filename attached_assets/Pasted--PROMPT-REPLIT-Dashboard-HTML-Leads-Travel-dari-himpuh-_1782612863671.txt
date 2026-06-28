@@ -1,0 +1,89 @@
+# PROMPT REPLIT — Dashboard HTML Leads Travel (dari himpuh-travel.json)
+
+Buatkan satu file `dashboard.html` (standalone, tanpa server) yang menampilkan data travel
+dari hasil scraping (`himpuh-travel.json` / `himpuh-travel.csv`) sebagai **dashboard follow-up
+yang elegan**. Saya buka langsung file HTML-nya di browser.
+
+## Sumber Data
+- Baca dari `himpuh-travel.json` (array of objek). Field tiap travel:
+  `nama_perusahaan, merek_dagang, kota, alamat, telepon, email, website, jenis_anggota, url_himpuh`.
+- Karena dibuka sebagai file lokal (file://) yang kadang tidak bisa fetch JSON, **embed datanya
+  langsung ke dalam HTML**: baca isi `himpuh-travel.json`, lalu tempelkan sebagai
+  `const DATA = [ ... ];` di dalam `<script>` pada dashboard.html. Jadi file HTML-nya
+  self-contained & bisa dibuka di mana saja.
+
+## Tampilan (Tabel Rapi & Elegan)
+Desain bersih, modern, profesional (bukan norak). Pakai:
+- Font sistem (system-ui), warna netral + 1 aksen (hijau emerald #059669 atau indigo #4f46e5).
+- Header sticky, baris zebra (selang-seling abu tipis), hover highlight, border halus, radius lembut.
+- Responsif: di layar kecil tabel bisa scroll horizontal.
+
+### Kolom tabel:
+1. **No**
+2. **Nama Travel** (nama_perusahaan; di bawahnya merek_dagang kecil abu-abu)
+3. **Kota**
+4. **Kontak** — tombol WA (kalau ada telepon) + tombol Email (kalau ada email)
+5. **Web** — link kalau ada website
+6. **Status** — dropdown: Belum dihubungi / Sudah dihubungi / Tertarik / Tidak tertarik / Deal
+7. **Aksi** — tombol "Salin Pitch" + link "Detail" (ke url_himpuh)
+
+## Fitur Wajib
+
+### 1. Search & Filter (di atas tabel)
+- Input search: filter by nama travel / merek (realtime saat ketik).
+- Dropdown filter Kota: isinya otomatis dari data (unik). Pilih kota → tabel terfilter.
+- Dropdown filter Status: tampilkan semua / per status.
+- Tampilkan counter: "Menampilkan X dari Y travel".
+
+### 2. Tombol WA & Email langsung klik
+- **WA**: buka `https://wa.me/<nomor>` — bersihkan nomor: buang spasi/strip, kalau diawali `0`
+  ganti jadi `62`, kalau diawali `+` buang `+`. Kalau telepon kosong, tombol disabled/abu.
+- **Email**: `mailto:<email>`. Kalau kosong, disabled.
+
+### 3. Tandai Status (persisten)
+- Dropdown status per baris. Simpan pilihan ke **localStorage** (key by nama_perusahaan atau id),
+  jadi saat dibuka lagi statusnya tetap tersimpan.
+- Beri warna badge sesuai status (mis. Tertarik = hijau, Tidak tertarik = merah, Deal = biru).
+- Catatan: localStorage hanya jalan di browser biasa (bukan di sandbox artifact) — ini dibuka
+  sebagai file HTML lokal, jadi localStorage OK.
+
+### 4. Tombol "Salin Pitch"
+- Saat diklik, salin ke clipboard pesan pembuka WA yang sudah dipersonalisasi dengan nama travel.
+  Template:
+  ```
+  Assalamualaikum, perkenalkan saya [NAMA SAYA] dari Umrahme.
+
+  Saya melihat {merek_dagang/nama_perusahaan} di direktori HIMPUH. Saya mengembangkan
+  aplikasi pendamping umrah ber-merek travel sendiri (white-label) — jamaah dapat jadwal,
+  doa, panduan ibadah, peta ziarah, sampai pengumuman, semua dalam satu aplikasi bernama
+  travel Bapak/Ibu.
+
+  Boleh saya kirimkan demo singkatnya? Cukup 3 menit, tanpa komitmen.
+  ```
+  - Ganti `{merek_dagang/nama_perusahaan}` dengan data baris itu (pakai merek_dagang kalau ada,
+    kalau tidak pakai nama_perusahaan).
+  - Biarkan `[NAMA SAYA]` sebagai placeholder (saya isi sendiri), ATAU sediakan input "Nama Anda"
+    di header yang nilainya dipakai di semua pitch.
+  - Setelah salin, tampilkan toast/feedback "Pesan tersalin ✓".
+
+### 5. Statistik ringkas (kartu kecil di atas)
+- Total travel, jumlah per status (Belum dihubungi, Tertarik, Deal). Update realtime saat status berubah.
+
+### 6. Export
+- Tombol "Export CSV" — unduh data + status terkini sebagai CSV (biar bisa dibuka di Excel).
+
+## Catatan Teknis
+- Semua dalam SATU file `dashboard.html` (HTML+CSS+JS inline). Tanpa library eksternal/CDN
+  (biar bisa dibuka offline). Vanilla JS saja.
+- Jangan pakai framework. Jangan pakai server.
+- Pastikan aman kalau ada field kosong (telepon/email/website kosong → tombol disabled, bukan error).
+- Setelah jadi, beri tahu cara membukanya (klik kanan file → Download → buka di browser, atau
+  preview langsung).
+
+## Verifikasi
+- Tabel tampil rapi dengan semua travel dari data.
+- Search & filter kota/status berfungsi.
+- Tombol WA membuka chat ke nomor yang benar; Email membuka mailto.
+- Ganti status → tersimpan walau halaman di-refresh.
+- "Salin Pitch" menyalin pesan dengan nama travel yang benar.
+- Statistik & export berfungsi.
