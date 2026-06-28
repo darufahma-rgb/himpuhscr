@@ -172,11 +172,14 @@ async function upsertSupabase(data) {
 
 async function updateProgressSupabase(lastId, jumlah) {
   if (!supabase) return;
-  const { error } = await supabase
-    .from('scraper_progress')
-    .upsert({ id: 1, last_id: lastId, jumlah, saved_at: new Date().toISOString() }, { onConflict: 'id' })
-    .catch(() => ({ error: null }));
-  if (error) logError('updateProgressSupabase', lastId, error);
+  try {
+    const { error } = await supabase
+      .from('scraper_progress')
+      .upsert({ id: 1, last_id: lastId, jumlah, saved_at: new Date().toISOString() }, { onConflict: 'id' });
+    if (error) logError('updateProgressSupabase', lastId, error);
+  } catch (e) {
+    logError('updateProgressSupabase', lastId, e);
+  }
 }
 
 // ---------- file saves (backup) ----------

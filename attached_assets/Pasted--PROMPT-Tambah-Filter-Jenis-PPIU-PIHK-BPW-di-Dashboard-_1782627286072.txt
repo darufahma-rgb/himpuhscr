@@ -1,0 +1,140 @@
+# PROMPT — Tambah Filter Jenis (PPIU/PIHK/BPW) di Dashboard
+
+## File
+`vercel-app/public/index.html`
+
+## Yang ditambahkan
+Filter dropdown "Semua Jenis" di sebelah filter Kota dan Status,
+isinya otomatis dari data (PIHK, PPIU, BPW, dll).
+
+---
+
+## LANGKAH 1 — Tambah dropdown filter Jenis di HTML
+
+Cari baris yang berisi dropdown filter kota dan status:
+```html
+<select id="kotaFilter" ...>
+...
+<select id="statusFilter" ...>
+```
+
+Tambahkan dropdown baru DI ANTARA keduanya (setelah kotaFilter, sebelum statusFilter):
+```html
+<select id="jenisFilter" style="padding:7px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:13px;outline:none;background:white;cursor:pointer;">
+  <option value="">Semua Jenis</option>
+</select>
+```
+
+---
+
+## LANGKAH 2 — Tambah fungsi rebuildJenisFilter
+
+Di dalam `<script>`, cari fungsi `rebuildKotaFilter()`. Tambahkan fungsi baru tepat setelahnya:
+
+```js
+function rebuildJenisFilter() {
+  const sel = document.getElementById('jenisFilter');
+  const cur = sel.value;
+  // Ambil jenis unik dari data, sederhanakan label
+  const jenisMap = {};
+  DATA.forEach(t => {
+    const raw = (t.jenis_anggota || '').trim();
+    if (!raw) return;
+    // Sederhanakan: ambil kata kunci utama
+    let label = raw;
+    if (raw.includes('Haji Khusus')) label = 'PIHK — Penyelenggara Haji Khusus';
+    else if (raw.includes('Ibadah Umrah') || raw.includes('Perjalanan Ibadah Umrah')) label = 'PPIU — Penyelenggara Umrah';
+    else if (raw.includes('Biro Perjalanan')) label = 'BPW — Biro Perjalanan Wisata';
+    jenisMap[label] = raw; // label → nilai asli
+  });
+  // Rebuild options
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Semua Jenis</option>';
+  Object.keys(jenisMap).sort().forEach(label => {
+    const opt = document.createElement('option');
+    opt.value = label;
+    opt.textContent = label;
+    sel.appendChild(opt);
+  });
+  sel.value = current || '';
+}
+```
+
+---
+
+## LANGKAH 3 — Update fungsi applyFilter
+
+Cari fungsi `applyFilter()`. Di dalam filter DATA, tambahkan kondisi jenis:
+
+```js
+function applyFilter() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const kota = document.getElementById('kotaFilter').value;
+  const status = document.getElementById('statusFilter').value;
+  const jenis = document.getElementById('jenisFilter').value; // ← tambah
+
+  filtered = DATA.filter(t => {
+    const matchQ = !q || 
+      t.nama_perusahaan.toLowerCase().includes(q) || 
+      (t.merek_dagang||'').toLowerCase().includes(q);
+    const matchKota = !kota || t.kota === kota;
+    const matchStatus = !status || getStatus(t.id) === status;
+    
+    // Filter jenis: cocokkan dengan label yang disederhanakan
+    let matchJenis = true;
+    if (jenis) {
+      const raw = (t.jenis_anggota || '').trim();
+      if (jenis.includes('PIHK')) matchJenis = raw.includes('Haji Khusus');
+      else if (jenis.includes('PPIU')) matchJenis = raw.includes('Umrah');
+      else if (jenis.includes('BPW')) matchJenis = raw.includes('Biro Perjalanan');
+      else matchJenis = raw === jenis;
+    }
+    
+    return matchQ && matchKota && matchStatus && matchJenis;
+  });
+
+  document.getElementById('counter').textContent = 
+    `Menampilkan ${filtered.length} dari ${DATA.length} travel`;
+  renderTable();
+  renderStats();
+}
+```
+
+---
+
+## LANGKAH 4 — Panggil rebuildJenisFilter saat data dimuat
+
+Cari baris `rebuildKotaFilter()` yang dipanggil setelah data dimuat (di dalam `loadData`).
+Tambahkan `rebuildJenisFilter()` tepat setelahnya:
+
+```js
+if (isNew) {
+  rebuildKotaFilter();
+  rebuildJenisFilter(); // ← tambah
+}
+```
+
+---
+
+## LANGKAH 5 — Pasang event listener
+
+Cari tempat event listener `kotaFilter` dan `statusFilter` dipasang. Tambahkan:
+```js
+document.getElementById('jenisFilter').addEventListener('change', applyFilter);
+```
+
+---
+
+## Catatan
+- Label disederhanakan: "Penyelenggara Ibadah Haji Khusus (PIHK)" → "PIHK — Penyelenggara Haji Khusus"
+- Pilihan muncul otomatis dari data (tidak hardcode)
+- Konsisten dengan filter kota & status yang sudah ada
+- Setelah selesai: commit & push ke GitHub
+
+## Verifikasi
+- Dropdown "Semua Jenis" muncul di antara filter Kota dan Status
+- Pilih "PIHK" → hanya travel PIHK yang muncul
+- Pilih "PPIU" → hanya travel PPIU yang muncul  
+- Pilih "BPW" → hanya travel BPW yang muncul
+- Counter "Menampilkan X dari 360 travel" update sesuai filter
+- Filter bisa dikombinasikan (misal: PPIU + Jakarta)
