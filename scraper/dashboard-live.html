@@ -333,7 +333,7 @@ async function loadData(manual = false) {
   btn.classList.add('spinning');
 
   try {
-    const res = await fetch('/api/data?t=' + Date.now());
+    const res = await fetch('/api/dashboard/data?t=' + Date.now());
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const newData = await res.json();
 
@@ -364,7 +364,7 @@ async function loadData(manual = false) {
 
 async function loadProgress() {
   try {
-    const res = await fetch('/api/progress?t=' + Date.now());
+    const res = await fetch('/api/dashboard/progress?t=' + Date.now());
     if (!res.ok) return;
     const p = await res.json();
     const bar = document.getElementById('progressBar');
