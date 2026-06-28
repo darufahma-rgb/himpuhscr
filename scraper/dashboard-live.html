@@ -291,6 +291,16 @@
 const RELOAD_INTERVAL_MS = 30_000; // auto-reload tiap 30 detik
 const END_ID = 950;
 
+// ═══ SECURITY ═══
+function escapeHtml(s) {
+  return (s ?? '').toString()
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ═══ CONSTANTS ═══
 const STATUS_KEY = 'himpuh_status_v1';
 const NAMA_KEY   = 'himpuh_nama_v1';
@@ -469,36 +479,41 @@ function renderTable() {
     const st     = getStatus(d);
     const merek  = d.merek_dagang && d.merek_dagang !== d.nama_perusahaan ? d.merek_dagang : '';
 
-    const waBtn = waNum
-      ? `<a class="btn-wa" href="https://wa.me/${waNum}" target="_blank" rel="noopener">
+    const safeWaNum  = waNum  ? escapeHtml(waNum)  : null;
+    const safeEmail1 = email1 ? escapeHtml(email1) : null;
+    const safeWeb    = web    ? escapeHtml(web)    : null;
+    const safeWebLabel = escapeHtml((d.website || '').replace(/^https?:\/\//, '').substring(0, 22));
+
+    const waBtn = safeWaNum
+      ? `<a class="btn-wa" href="https://wa.me/${safeWaNum}" target="_blank" rel="noopener">
            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.845L0 24l6.31-1.513A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818a9.818 9.818 0 01-5.003-1.366l-.359-.213-3.743.897.934-3.637-.234-.373A9.79 9.79 0 012.182 12C2.182 6.578 6.578 2.182 12 2.182S21.818 6.578 21.818 12 17.422 21.818 12 21.818z"/></svg>
            WA
          </a>`
       : `<button class="btn-wa disabled" disabled>WA</button>`;
 
-    const emailBtn = email1
-      ? `<a class="btn-email" href="mailto:${email1}">
+    const emailBtn = safeEmail1
+      ? `<a class="btn-email" href="mailto:${safeEmail1}">
            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,12 2,6"/></svg>
            Email
          </a>`
       : `<button class="btn-email disabled" disabled>Email</button>`;
 
-    const webCell = web
-      ? `<a href="${web}" target="_blank" rel="noopener">${(d.website||'').replace(/^https?:\/\//,'').substring(0,22)}</a>`
+    const webCell = safeWeb
+      ? `<a href="${safeWeb}" target="_blank" rel="noopener">${safeWebLabel}</a>`
       : `<span class="no-web">—</span>`;
 
     const statusOpts = STATUSES.map(s =>
-      `<option value="${s}"${s===st?' selected':''}>${s}</option>`
+      `<option value="${escapeHtml(s)}"${s===st?' selected':''}>${escapeHtml(s)}</option>`
     ).join('');
 
     return `<tr>
       <td class="td-no">${i+1}</td>
       <td class="td-nama">
-        <div class="nama">${d.nama_perusahaan}</div>
-        ${merek ? `<div class="merek">${merek}</div>` : ''}
+        <div class="nama">${escapeHtml(d.nama_perusahaan)}</div>
+        ${merek ? `<div class="merek">${escapeHtml(merek)}</div>` : ''}
       </td>
-      <td class="td-kota">${d.kota||'—'}</td>
-      <td style="font-size:11px;color:var(--gray-500);max-width:110px;white-space:normal">${d.jenis_anggota||'—'}</td>
+      <td class="td-kota">${escapeHtml(d.kota) || '—'}</td>
+      <td style="font-size:11px;color:var(--gray-500);max-width:110px;white-space:normal">${escapeHtml(d.jenis_anggota) || '—'}</td>
       <td><div class="contact-btns">${waBtn}${emailBtn}</div></td>
       <td class="td-web">${webCell}</td>
       <td>
@@ -509,7 +524,7 @@ function renderTable() {
       </td>
       <td class="td-aksi">
         <button class="btn-pitch" onclick="salinPitch(${JSON.stringify(d.nama_perusahaan)},${JSON.stringify(d.merek_dagang)})">Salin Pitch</button>
-        <a class="btn-detail" href="${d.url_himpuh}" target="_blank" rel="noopener">Detail</a>
+        <a class="btn-detail" href="${escapeHtml(d.url_himpuh)}" target="_blank" rel="noopener">Detail</a>
       </td>
     </tr>`;
   }).join('');

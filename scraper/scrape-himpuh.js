@@ -2,7 +2,7 @@
  * scrape-himpuh.js  (versi auto-save bertahap)
  * ----------------------------------------------------------------------------
  * Mengambil data anggota dari direktori PUBLIK HIMPUH (himpuh.or.id),
- * lalu menyimpan ke CSV untuk follow-up MANUAL satu per satu.
+ * lalu menyimpan ke CSV & JSON untuk follow-up MANUAL satu per satu.
  *
  * FITUR AUTO-SAVE:
  *  - Data disimpan ke CSV & JSON setiap SAVE_EVERY data berhasil dikumpulkan.
@@ -10,31 +10,34 @@
  *    jika proses terhenti di tengah jalan.
  *  - Jalankan ulang script → otomatis lanjut dari ID terakhir.
  *
- * PRINSIP SOPAN & BERTANGGUNG JAWAB:
- *  - Direktori ini publik & memang ditujukan agar anggota dikontak.
- *  - Script memberi JEDA antar request (default 2.5 detik).
- *  - Pakai data ini HANYA untuk follow-up personal yang relevan.
- *  - Hormati UU PDP & etika. Jangan blast spam massal.
- *
  * CARA PAKAI:
- *   1) npm install axios cheerio
- *   2) node scrape-himpuh.js          <- mulai / lanjut otomatis
- *   3) Hasil: himpuh-travel.csv
+ *   1) npm install              (dependensi ada di package.json)
+ *   2) node scrape-himpuh.js   <- mulai / lanjut otomatis
+ *   3) Hasil: himpuh-travel.csv / himpuh-travel.json
  * ----------------------------------------------------------------------------
  */
 
-const axios = require('axios');
+'use strict';
+
+const axios   = require('axios');
 const cheerio = require('cheerio');
-const fs = require('fs');
+const fs      = require('fs');
+const path    = require('path');
+const os      = require('os');
 
 // ====================== KONFIGURASI ======================
-const START_ID      = 1;       // ID awal (diabaikan jika ada progress.json)
-const END_ID        = 950;     // ID akhir
-const DELAY_MS      = 2500;    // Jeda antar request — JANGAN dikecilkan
-const SAVE_EVERY    = 10;      // Auto-save setiap N data berhasil dikumpulkan
-const OUTPUT_CSV    = 'himpuh-travel.csv';
-const OUTPUT_JSON   = 'himpuh-travel.json';
-const PROGRESS_FILE = 'progress.json';
+const START_ID      = 1;        // ID awal (diabaikan jika ada progress.json)
+const END_ID        = 950;      // ID akhir
+const DELAY_MS      = 2500;     // Jeda antar request — JANGAN dikecilkan
+const TIMEOUT_MS    = 15000;    // Timeout per request
+const MAX_REDIRECTS = 2;        // Maks redirect per request
+const SAVE_EVERY    = 10;       // Auto-save setiap N data berhasil dikumpulkan
+
+// Output ditulis ke direktori root workspace (parent scraper/)
+const ROOT_DIR      = path.resolve(__dirname, '..');
+const OUTPUT_CSV    = path.join(ROOT_DIR, 'himpuh-travel.csv');
+const OUTPUT_JSON   = path.join(ROOT_DIR, 'himpuh-travel.json');
+const PROGRESS_FILE = path.join(ROOT_DIR, 'progress.json');
 
 // Filter Jabodetabek (set false untuk ambil SEMUA wilayah)
 const FILTER_JABODETABEK = true;
@@ -45,8 +48,18 @@ const KOTA_JABODETABEK = [
 ];
 // =========================================================
 
-const BASE = 'https://himpuh.or.id/daftar-anggota/detail';
+const BASE  = 'https://himpuh.or.id/daftar-anggota/detail';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function log(msg) {
+  process.stdout.write(msg + '\n');
+}
+
+function logError(context, id, err) {
+  const ts  = new Date().toISOString();
+  const msg = err && err.message ? err.message : String(err);
+  process.stderr.write(`[${ts}] ERROR id=${id} op=${context}: ${msg}\n`);
+}
 
 // ---------- helpers ----------
 
@@ -72,7 +85,7 @@ function isJabodetabek(alamat) {
 
 function tebakKota(alamat) {
   if (!alamat) return '';
-  const a = alamat.toLowerCase();
+  const a     = alamat.toLowerCase();
   const found = KOTA_JABODETABEK.find((k) => a.includes(k));
   return found ? found.replace(/\b\w/g, (c) => c.toUpperCase()) : '';
 }
@@ -88,33 +101,53 @@ function csvEscape(s) {
   return `"${v}"`;
 }
 
+// ---------- atomic file writes ----------
+
+function atomicWrite(filePath, content, encoding) {
+  const tmp = filePath + '.tmp.' + process.pid;
+  fs.writeFileSync(tmp, content, encoding);
+  fs.renameSync(tmp, filePath);
+}
+
 // ---------- simpan ----------
 
 function simpanCSV(hasil) {
-  const header = [
-    'No', 'Nama Perusahaan', 'Merek Dagang', 'Kota', 'Alamat',
-    'Telepon/WA', 'Email', 'Website', 'Jenis', 'Link HIMPUH',
-    'Status Follow-up', 'Catatan',
-  ];
-  const rows = hasil.map((d, i) => [
-    i + 1, d.nama_perusahaan, d.merek_dagang, d.kota, d.alamat,
-    d.telepon, d.email, d.website, d.jenis_anggota, d.url_himpuh,
-    'Belum dihubungi', '',
-  ].map(csvEscape).join(','));
-  const csv = [header.map(csvEscape).join(','), ...rows].join('\n');
-  fs.writeFileSync(OUTPUT_CSV, '\uFEFF' + csv, 'utf8');
+  try {
+    const header = [
+      'No', 'Nama Perusahaan', 'Merek Dagang', 'Kota', 'Alamat',
+      'Telepon/WA', 'Email', 'Website', 'Jenis', 'Link HIMPUH',
+      'Status Follow-up', 'Catatan',
+    ];
+    const rows = hasil.map((d, i) => [
+      i + 1, d.nama_perusahaan, d.merek_dagang, d.kota, d.alamat,
+      d.telepon, d.email, d.website, d.jenis_anggota, d.url_himpuh,
+      'Belum dihubungi', '',
+    ].map(csvEscape).join(','));
+    const csv = [header.map(csvEscape).join(','), ...rows].join('\n');
+    atomicWrite(OUTPUT_CSV, '\uFEFF' + csv, 'utf8');
+  } catch (e) {
+    logError('simpanCSV', 'n/a', e);
+  }
 }
 
 function simpanJSON(hasil) {
-  fs.writeFileSync(OUTPUT_JSON, JSON.stringify(hasil, null, 2), 'utf8');
+  try {
+    atomicWrite(OUTPUT_JSON, JSON.stringify(hasil, null, 2), 'utf8');
+  } catch (e) {
+    logError('simpanJSON', 'n/a', e);
+  }
 }
 
 function simpanProgress(lastId, jumlah) {
-  fs.writeFileSync(
-    PROGRESS_FILE,
-    JSON.stringify({ lastId, jumlah, savedAt: new Date().toISOString() }),
-    'utf8'
-  );
+  try {
+    atomicWrite(
+      PROGRESS_FILE,
+      JSON.stringify({ lastId, jumlah, savedAt: new Date().toISOString() }),
+      'utf8'
+    );
+  } catch (e) {
+    logError('simpanProgress', lastId, e);
+  }
 }
 
 function muatProgress() {
@@ -122,7 +155,9 @@ function muatProgress() {
     if (fs.existsSync(PROGRESS_FILE)) {
       return JSON.parse(fs.readFileSync(PROGRESS_FILE, 'utf8'));
     }
-  } catch (_) {}
+  } catch (e) {
+    logError('muatProgress', 'n/a', e);
+  }
   return null;
 }
 
@@ -131,7 +166,9 @@ function muatHasilLama() {
     if (fs.existsSync(OUTPUT_JSON)) {
       return JSON.parse(fs.readFileSync(OUTPUT_JSON, 'utf8'));
     }
-  } catch (_) {}
+  } catch (e) {
+    logError('muatHasilLama', 'n/a', e);
+  }
   return [];
 }
 
@@ -141,12 +178,12 @@ async function scrapeOne(id) {
   const url = `${BASE}/${id}`;
   try {
     const res = await axios.get(url, {
-      timeout: 15000,
+      timeout: TIMEOUT_MS,
       headers: {
         'User-Agent': 'Mozilla/5.0 (riset-kontak-travel; follow-up manual)',
-        'Accept': 'text/html',
+        'Accept': 'text/html,application/xhtml+xml',
       },
-      maxRedirects: 2,
+      maxRedirects: MAX_REDIRECTS,
       validateStatus: (s) => s >= 200 && s < 400,
     });
 
@@ -168,68 +205,105 @@ async function scrapeOne(id) {
     };
     data.kota = tebakKota(data.alamat);
     return data;
-  } catch (_) {
+  } catch (e) {
+    const code = e.code || (e.response && e.response.status) || 'ERR';
+    logError(`scrapeOne(${code})`, id, e);
     return null;
   }
 }
 
+// ---------- graceful shutdown ----------
+
+let _hasil        = [];
+let _lastSavedId  = null;
+let _shuttingDown = false;
+
+function handleShutdown(signal) {
+  if (_shuttingDown) return;
+  _shuttingDown = true;
+  log(`\n[scraper] ${signal} — menyimpan progress dan berhenti…`);
+  if (_lastSavedId !== null) {
+    simpanCSV(_hasil);
+    simpanJSON(_hasil);
+    simpanProgress(_lastSavedId, _hasil.length);
+    log(`[scraper] Progress disimpan: ${_hasil.length} travel, ID terakhir ${_lastSavedId}`);
+  }
+  process.exit(0);
+}
+process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+process.on('SIGINT',  () => handleShutdown('SIGINT'));
+
 // ---------- main ----------
 
 async function main() {
-  const prog   = muatProgress();
-  const hasil  = muatHasilLama();
+  const prog    = muatProgress();
+  const hasil   = muatHasilLama();
   const startId = prog ? prog.lastId + 1 : START_ID;
 
+  _hasil = hasil;
+
   if (prog) {
-    console.log(`▶ Melanjutkan dari ID ${startId} (sudah ${hasil.length} travel tersimpan).`);
+    log(`▶ Melanjutkan dari ID ${startId} (sudah ${hasil.length} travel tersimpan).`);
   } else {
-    console.log(`▶ Mulai baru — ID ${START_ID}–${END_ID}, jeda ${DELAY_MS}ms/req.`);
+    log(`▶ Mulai baru — ID ${START_ID}–${END_ID}, jeda ${DELAY_MS}ms/req.`);
   }
-  console.log(`  Auto-save setiap ${SAVE_EVERY} data terkumpul.\n`);
+  log(`  Auto-save setiap ${SAVE_EVERY} data terkumpul.\n`);
 
   let dicek        = 0;
   let baruDikumpul = 0;
 
   for (let id = startId; id <= END_ID; id++) {
+    if (_shuttingDown) break;
+
     const data = await scrapeOne(id);
     dicek++;
+    _lastSavedId = id;
 
     if (data) {
       const lolos = !FILTER_JABODETABEK || isJabodetabek(data.alamat);
       if (lolos) {
         hasil.push(data);
         baruDikumpul++;
-        console.log(`✓ [${id}] ${data.nama_perusahaan} — ${data.kota || '?'} — ${data.telepon || 'no telp'}`);
+        log(`✓ [${id}] ${data.nama_perusahaan} — ${data.kota || '?'} — ${data.telepon || 'no telp'}`);
 
         if (baruDikumpul % SAVE_EVERY === 0) {
           simpanCSV(hasil);
           simpanJSON(hasil);
           simpanProgress(id, hasil.length);
-          console.log(`  💾 Auto-saved ${hasil.length} travel → ${OUTPUT_CSV}`);
+          log(`  💾 Auto-saved ${hasil.length} travel → ${OUTPUT_CSV}`);
         }
       } else {
-        console.log(`· [${id}] ${data.nama_perusahaan} (luar Jabodetabek, dilewati)`);
+        log(`· [${id}] ${data.nama_perusahaan} (luar Jabodetabek, dilewati)`);
       }
     }
 
     if (dicek % 50 === 0) {
-      console.log(`  ── ${dicek} ID dicek, ${hasil.length} travel terkumpul ──`);
+      log(`  ── ${dicek} ID dicek, ${hasil.length} travel terkumpul ──`);
       simpanProgress(id, hasil.length);
     }
 
-    await sleep(DELAY_MS);
+    if (!_shuttingDown) await sleep(DELAY_MS);
   }
 
-  simpanCSV(hasil);
-  simpanJSON(hasil);
-  simpanProgress(END_ID, hasil.length);
+  if (!_shuttingDown) {
+    simpanCSV(hasil);
+    simpanJSON(hasil);
+    simpanProgress(END_ID, hasil.length);
 
-  console.log(`\n✅ Selesai! ${hasil.length} travel ${FILTER_JABODETABEK ? 'Jabodetabek ' : ''}tersimpan:`);
-  console.log(`  📄 ${OUTPUT_CSV}   <- buka di Excel / Google Sheets`);
-  console.log(`  📄 ${OUTPUT_JSON}`);
-  console.log('\nIngat: follow-up manual & personal. Jangan blast spam. Hormati UU PDP.');
+    log(`\n✅ Selesai! ${hasil.length} travel ${FILTER_JABODETABEK ? 'Jabodetabek ' : ''}tersimpan:`);
+    log(`  📄 ${OUTPUT_CSV}   <- buka di Excel / Google Sheets`);
+    log(`  📄 ${OUTPUT_JSON}`);
+    log('\nIngat: follow-up manual & personal. Jangan blast spam. Hormati UU PDP.');
 
-  if (fs.existsSync(PROGRESS_FILE)) fs.unlinkSync(PROGRESS_FILE);
+    try {
+      if (fs.existsSync(PROGRESS_FILE)) fs.unlinkSync(PROGRESS_FILE);
+    } catch (e) {
+      logError('unlinkProgress', 'n/a', e);
+    }
+  }
 }
 
-main();
+main().catch((e) => {
+  logError('main', 'n/a', e);
+  process.exit(1);
+});

@@ -1,0 +1,227 @@
+The dependency issue is now fixed.
+
+I want you to perform a COMPLETE production-readiness audit of the entire repository.
+
+Do NOT assume the project is production-ready just because it runs.
+
+Treat this like a senior software engineer performing a final code review before deployment.
+
+---
+
+## 1. Security Audit
+
+Search the entire repository for:
+
+* exposed secrets
+* API keys
+* hardcoded credentials
+* tokens
+* cookies
+* session IDs
+* passwords
+* absolute local paths
+* debug endpoints
+* unsafe eval()
+* child_process execution
+* shell injection
+* command injection
+* path traversal
+* unsafe file writes
+* unsafe JSON parsing
+* XSS risks
+* SSRF risks
+* prototype pollution risks
+
+Fix every issue found.
+
+---
+
+## 2. Error Handling
+
+Ensure every async operation has proper try/catch.
+
+Check:
+
+* axios requests
+* file reads
+* file writes
+* JSON parsing
+* scraper loops
+* API endpoints
+
+One failed website must NEVER stop the entire scraping process.
+
+Continue processing remaining websites.
+
+---
+
+## 3. HTTP Requests
+
+Audit every axios request.
+
+Ensure:
+
+* timeout is configured
+* redirects handled correctly
+* retry strategy exists
+* custom User-Agent exists
+* Accept headers are appropriate
+
+Avoid hanging requests.
+
+---
+
+## 4. Scraper Reliability
+
+Check that:
+
+* one failed website doesn't terminate scraping
+* invalid HTML doesn't crash cheerio
+* empty responses are handled
+* duplicate records are prevented
+* partial saves are safe
+
+---
+
+## 5. File System
+
+Audit every file access.
+
+Ensure:
+
+* directories exist before writing
+* atomic writes where appropriate
+* path.resolve() is used
+* no relative path bugs
+* missing files return graceful errors
+
+---
+
+## 6. API Review
+
+Audit every endpoint.
+
+Ensure:
+
+* proper HTTP status codes
+* consistent JSON responses
+* input validation
+* no uncaught exceptions
+* no stack traces exposed
+
+---
+
+## 7. Performance
+
+Look for:
+
+* unnecessary synchronous file operations
+* duplicate parsing
+* repeated JSON loading
+* memory leaks
+* unnecessary loops
+* inefficient searches
+
+Optimize where possible.
+
+---
+
+## 8. Concurrency
+
+Review scraper execution.
+
+If many websites are scraped:
+
+avoid unlimited Promise.all()
+
+Implement controlled concurrency if needed.
+
+---
+
+## 9. Logging
+
+Replace vague console.log() calls with structured logging.
+
+Every error should include:
+
+* timestamp
+* website
+* operation
+* error message
+
+---
+
+## 10. Configuration
+
+Move every configurable value into one config.
+
+Examples:
+
+* timeout
+* retry count
+* output directory
+* concurrency
+* API base URL
+
+Avoid magic numbers.
+
+---
+
+## 11. Code Quality
+
+Identify:
+
+* duplicated code
+* dead code
+* unused functions
+* unused imports
+* large functions
+* inconsistent naming
+
+Refactor only when behavior is preserved.
+
+---
+
+## 12. Production Checklist
+
+Verify:
+
+✓ clean startup
+
+✓ graceful shutdown
+
+✓ deterministic installs
+
+✓ no missing dependencies
+
+✓ no TODOs affecting functionality
+
+✓ no debug code
+
+✓ no console spam
+
+✓ no hidden runtime assumptions
+
+---
+
+## Final Report
+
+At the end provide:
+
+### Critical Issues
+
+### High Priority
+
+### Medium Priority
+
+### Low Priority
+
+For each issue include:
+
+* file
+* explanation
+* fix applied
+
+Do not simply say "looks good."
+
+Perform a genuine engineering audit and improve the repository wherever appropriate.
